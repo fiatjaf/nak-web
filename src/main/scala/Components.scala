@@ -108,7 +108,7 @@ object Components {
       ),
       relayHints(store, evp.relays),
       evp.author.map { pk =>
-        entry("author hint (pubkey hex)", pk.value.toHex)
+        entry("author (pubkey hex)", pk.value.toHex)
       },
       nip19_21(store, "nevent", NIP19.encode(evp)),
       entry(
