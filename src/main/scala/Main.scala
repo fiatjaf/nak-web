@@ -42,7 +42,7 @@ object Main extends IOWebApp {
         div(
           cls := "flex justify-end mr-5 mt-10 text-xs w-4/5",
           a(
-            href := "https://github.com/fiatjaf/nak",
+            href := "https://github.com/fiatjaf/nak-web",
             "source code"
           ),
           a(
