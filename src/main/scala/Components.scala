@@ -403,9 +403,15 @@ object Components {
                       // confirm adding a relay hint
                       evt.key match {
                         case "Enter" =>
-                          self.value.get.flatMap(url =>
-                            if url.startsWith("wss://") || url
-                                .startsWith("ws://")
+                          self.value.get
+                          .map{
+                            case url if url.isEmpty => url
+                            case url if url.contains("://") => url
+                            case url if !url.contains("://") && url.nonEmpty => url.prependedAll("wss://")
+                            case _ => ""
+                          }
+                          .flatMap(url =>
+                            if url.contains("://")
                             then {
                               store.result.get.flatMap(result =>
                                 store.input.set(
