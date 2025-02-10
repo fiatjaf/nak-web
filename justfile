@@ -11,3 +11,9 @@ cloudflare:
     rm -fr cf
 
 build-and-deploy: build-prod cloudflare
+
+build-gh-pages: build-prod
+    ./build-gh-pages.sh
+
+
+        
