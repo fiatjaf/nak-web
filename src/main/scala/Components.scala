@@ -471,6 +471,6 @@ object Components {
       )
     )
 
-  private val edit = img(cls := "inline w-4 ml-2", src := "edit.svg")
-  private val external = img(cls := "inline w-4 ml-2", src := "ext.svg")
+  private val edit = img(cls := "inline w-4 ml-2", src := "./edit.svg")
+  private val external = img(cls := "inline w-4 ml-2", src := "./ext.svg")
 }
