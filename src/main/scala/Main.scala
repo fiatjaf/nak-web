@@ -25,7 +25,7 @@ object Main extends IOWebApp {
             cls := "px-1 py-2 text-center text-xl",
             img(
               cls := "inline-block w-8 mr-2",
-              src := "/favicon.ico"
+              src := "./favicon.ico"
             ),
             a(
               href := "/",
