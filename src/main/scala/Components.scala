@@ -110,6 +110,9 @@ object Components {
       evp.author.map { pk =>
         entry("author (pubkey hex)", pk.value.toHex)
       },
+      evp.kind.map { kind => 
+        entry("kind", kind.toString)
+      },
       nip19_21(store, "nevent", NIP19.encode(evp)),
       entry(
         "note",
@@ -270,7 +273,7 @@ object Components {
         nip19_21(
           store,
           "nevent",
-          NIP19.encode(EventPointer(id, author = event.pubkey))
+          NIP19.encode(EventPointer(id, author = event.pubkey, kind = Some(event.kind)))
         )
       ),
       if event.kind >= 30000 && event.kind < 40000 then
