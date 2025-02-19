@@ -6,7 +6,7 @@ scalaVersion := "3.3.4"
 lazy val root = (project in file("."))
   .settings(
     libraryDependencies ++= Seq(
-      "com.armanbilge" %%% "calico" % "0.2.0-RC2",
+      "com.armanbilge" %%% "calico" % "0.2.3",
       "io.github.vzxplnhqr" %%% "snow" % "0.0.5"
     ),
     scalaJSUseMainModuleInitializer := true,
