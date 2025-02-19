@@ -4,7 +4,8 @@ import cats.effect.syntax.all.*
 import cats.syntax.all.*
 import fs2.concurrent.*
 import fs2.dom.{Event => _, *}
-import scoin.PrivateKey
+import org.http4s.Uri
+import snow.*
 
 case class Store(
     input: SignallingRef[IO, String],
@@ -16,14 +17,20 @@ object Store {
     val key = "nak-input"
 
     for {
-      input <- SignallingRef[IO].of("").toResource
+      // if the browser has been loaded with a url like /#/npub1g4f...
+      // then we will start our textarea off with that value
+      urlparam <- window.location.hash.get.map(_.stripPrefix("#/")).map(Uri.decode(_)).toResource
+      input <- SignallingRef[IO].of(urlparam).toResource
       result <- SignallingRef[IO, Result](Left("")).toResource
 
       _ <- Resource.eval {
-        OptionT(window.localStorage.getItem(key))
-          .foreachF(input.set(_))
+        if( urlparam.isEmpty )
+          OptionT(window.localStorage.getItem(key))
+            .foreachF(input.set(_))
+        else
+          IO.unit
       }
-
+      
       _ <- window.localStorage
         .events(window)
         .foreach {
@@ -37,10 +44,12 @@ object Store {
 
       _ <- input.discrete
         .evalTap(input => IO.cede *> window.localStorage.setItem(key, input))
-        .evalTap(input => result.set(Parser.parseInput(input.trim())))
+        .map(input => (input, Parser.parseInput(input.trim())))
+        .evalTap((input, parsed) => result.set(parsed) *> window.location.assign("#/" ++ input.trim()))
         .compile
         .drain
         .background
     } yield Store(input, result)
   }
+    
 }
