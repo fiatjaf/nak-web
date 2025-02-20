@@ -1,9 +1,9 @@
-import cats.data.{Store => *, *}
+import cats.data.{Store as *, *}
 import cats.effect.*
 import cats.effect.syntax.all.*
 import cats.syntax.all.*
 import fs2.concurrent.*
-import fs2.dom.{Event => _, *}
+import fs2.dom.{Event as _, *}
 import io.circe.parser.*
 import io.circe.syntax.*
 import calico.*
@@ -176,6 +176,25 @@ object Components {
       nip19_21(store, "naddr", NIP19.encode(addr)),
       entry("nip33 'a' tag", nip33atag, Some(selectable(store, nip33atag)))
     )
+  }
+
+  def renderFilter(
+    store: Store,
+    filter: Filter
+  ): Resource[IO, HtmlDivElement[IO]] = {
+    import org.http4s.syntax.literals.uri
+    for
+      // hard-coded for now TODO: make widget for changing this
+      relay <- Relay.mkResourceForIO(uri"wss://relay.damus.io")
+      (storedEvents, liveEvents) <- relay.subscribe(filter)
+      eventsRef <- SignallingRef[IO].of(storedEvents).toResource
+      _ <- liveEvents.take(50).evalTap(event => eventsRef.update(_.appended(event))).compile.drain.background
+      html <- 
+        div(
+          span(s"streaming first 50 filtered events from: ${relay.uri}"),
+          eventsRef.map(xs => ul(xs.map(x => li(x.serialized))))
+        )
+    yield html 
   }
 
   def renderEvent(
