@@ -2,6 +2,7 @@ enablePlugins(ScalaJSPlugin, EsbuildPlugin)
 
 name := "nostr-army-knife"
 scalaVersion := "3.3.4"
+scalacOptions ++= Seq("-source:future","-rewrite", "-source", "future-migration")
 
 lazy val root = (project in file("."))
   .settings(
