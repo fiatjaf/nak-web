@@ -2,7 +2,7 @@ import cats.effect.*
 import cats.effect.syntax.all.*
 import cats.syntax.all.*
 import fs2.concurrent.*
-import fs2.dom.{Event => _, *}
+import fs2.dom.{Event as _, *}
 import io.circe.parser.*
 import io.circe.syntax.*
 import calico.*
