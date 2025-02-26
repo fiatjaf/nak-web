@@ -58,7 +58,12 @@ object Store {
         .evalTap{
           input => 
             router.location.get.map(inputFromUri)
-              .map(_ == input).ifM(
+              // for security we will not update the url if the input is
+              // an nsec since we can easily detect an nsec. However, if it
+              // is a generic 32-byte string, it could be a public key or a
+              // private key, so we risk it and put it in the url to make for
+              // easier testing/debugging. But maybe this is the wrong decision?
+              .map(_ == input || input.startsWith("nsec")).ifM(
                 ifTrue = IO.unit,
                 ifFalse = router.navigate(uriFromInput(input))
               )
