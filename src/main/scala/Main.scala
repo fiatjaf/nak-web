@@ -13,6 +13,7 @@ import snow.*
 
 import Utils.*
 import Components.*
+import scala.concurrent.duration.*
 
 object Main extends IOWebApp {
   def render: Resource[IO, HtmlDivElement[IO]] = Store(window).flatMap {
@@ -80,6 +81,52 @@ object Main extends IOWebApp {
             ))
           )
         case _ => div("")
+      },
+      store.result.map {
+        case Right(evp: EventPointer) if evp.relays.nonEmpty =>
+          Some(
+            SignallingRef[IO].of(false).toResource.flatMap { fetchIsInProgress =>
+
+              def fetchFromRelay(rawUri: String): IO[Option[Event]] = 
+                IO.fromEither(org.http4s.Uri.fromString(rawUri))
+                    .toResource
+                    .flatMap(Relay.mkResourceForIO(_))
+                    .use{ relay => relay.lookupEventById(evp.id, timeout = 30.seconds) }
+                    .reject{ 
+                      case None => new RuntimeException(s"event-not-found: ${evp.id} not found at $rawUri")
+                    }
+              
+              val tryFetchFromEachOrNone = 
+                multiRaceAllFailOrFirstToSucceed(evp.relays.map(fetchFromRelay))
+                .recover(_ => None)
+
+              def updateInput(maybeEvent: Option[Event]): IO[Unit] = maybeEvent match
+                case Some(event) => store.input.set(event.asJson.printWith(jsonPrinter))
+                // for now we will just display a failure message in the input
+                // textarea, but this should be made better
+                case None => 
+                  store.input.set(s"tried all the given relay hints, but event ${evp.id} was not found.")
+          
+              val fetchOrUnit = fetchIsInProgress.get.flatMap {
+                case true => IO.unit
+                case false => 
+                  fetchIsInProgress.set(true) 
+                  *> tryFetchFromEachOrNone.flatMap(updateInput) 
+                  *> fetchIsInProgress.set(false)
+              }
+              val buttonLabel = fetchIsInProgress.map {
+                case true => "fetching ..."
+                case false => "fetch event"
+              }
+              button(
+                Styles.button,
+                buttonLabel,
+                onClick -->(_.foreach(_ => fetchOrUnit)),
+                disabled <-- fetchIsInProgress
+              )
+            }
+          )
+        case _ => None
       },
       button(
         Styles.button,
