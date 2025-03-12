@@ -9,9 +9,12 @@ import io.circe.syntax.*
 import calico.*
 import calico.html.io.{*, given}
 import calico.syntax.*
+import calico.frp.given
 import scodec.bits.ByteVector
 import scoin.*
 import snow.*
+
+import org.http4s.syntax.literals.uri
 
 import Utils.*
 
@@ -184,6 +187,9 @@ object Components {
   ): Resource[IO, HtmlDivElement[IO]] =
     div(
       cls := "text-md",
+      if event.isValid then
+        Some(renderSubmitEvent(store, event))
+      else None,
       if event.pubkey.isEmpty then
         Some(
           div(
@@ -304,6 +310,145 @@ object Components {
         )
     )
 
+  def renderSubmitEvent(
+    store: Store, 
+    event: Event
+  ): Resource[IO, HtmlDivElement[IO]] =   
+    if(event.isValid) then
+      SignallingRef[IO].of(Option.empty[Messages.FromRelay.OK]).toResource.flatMap { 
+        relayReply =>
+          div(
+            cls := "flex items-center space-x-3",
+            span(cls := "font-bold", "submit to relay? "),
+            div(
+              cls := "flex flex-wrap max-w-xl",
+              renderSubmitToRelay(store,event,"ws://localhost:10547"),
+              renderSubmitToRelay(store,event,"wss://relay.damus.io"),
+              renderInputCustomRelay(store,event)
+            )
+          )
+      }
+    else
+      div("invalid event; cannot yet submit to relay")
+
+  def renderSubmitToRelay(
+    store: Store,
+    validEvent: Event,
+    initialRelayUri: String,
+    submitOnFirstLoad: Boolean = false
+  ): Resource[IO, HtmlDivElement[IO]] = 
+    (
+      SignallingRef[IO].of(false).toResource,
+      SignallingRef[IO].of(Option.empty[Messages.FromRelay.OK]).toResource
+    ).tupled.flatMap { 
+      (awaitingReply, relayReply) =>
+        val submitEvent = 
+          IO.fromEither(org.http4s.Uri.fromString(initialRelayUri))
+            .toResource
+            .flatMap(Relay.mkResourceForIO(_))
+            .use(relay => 
+              awaitingReply.set(true) 
+              *> (relay.submitEvent(validEvent).option >>= relayReply.set)
+              <* (awaitingReply.set(false))
+            ).recoverWith{
+              case e: java.io.IOException => 
+                relayReply.set(Some(Messages.FromRelay.OK("",false,"websocket connection error")))
+                *> awaitingReply.set(false) 
+            }
+        
+        val buttonLabel = (awaitingReply: Signal[IO,Boolean]).flatMap {
+          case false => relayReply.map {
+            case None => s"$initialRelayUri"
+            case Some(Messages.FromRelay.OK(_,accepted,_)) 
+              if accepted => s"$initialRelayUri - \u2705"
+            case Some(Messages.FromRelay.OK(_,accepted,message))
+              if !accepted => s"$initialRelayUri - FAIL - $message"
+            case _ => s"$initialRelayUri"
+          }
+          case true => relayReply.map(_ => s"$initialRelayUri - ...")
+        }
+
+        val isConnectionError = relayReply.map{
+          case Some(Messages.FromRelay.OK(_,accepted, msg))
+            if(!accepted && msg.contains("connection error")) => true
+          case _ => false
+        }
+
+        val onFirstLoad = if(submitOnFirstLoad) then submitEvent else IO.unit
+
+        onFirstLoad.background *>
+        div(
+          isConnectionError.map{
+            case false =>
+              div(
+                cls := "flex items-center rounded",
+                button(
+                  Styles.buttonSmall,
+                  buttonLabel,
+                  onClick --> (_.foreach{_ => submitEvent }),
+                  disabled <-- awaitingReply
+                )
+              )
+            case true =>
+              renderInputCustomRelay(store,validEvent, initialButtonLabel = "websocket connection error")
+          }
+        )
+    }
+
+  def renderInputCustomRelay(
+    store: Store,
+    validEvent: Event,
+    initialButtonLabel: String = "Custom Relay"
+  ): Resource[IO, HtmlDivElement[IO]] = (
+    SignallingRef[IO].of(false).toResource,
+    SignallingRef[IO].of("").toResource
+  ).flatMapN{
+    (isActive, rawRelayUri) =>
+      div(
+        (isActive: Signal[IO,Boolean]).map {
+          case true =>
+            div(
+              rawRelayUri.map {
+                case url if url.isEmpty =>
+                    input.withSelf { self => 
+                      (
+                        defaultValue := "ws://localhost:10547",
+                        onKeyPress --> (_.foreach(evt =>
+                          evt.key match {
+                            case "Enter" =>
+                              self.value.get
+                              .map{
+                                case url if url.isEmpty => url
+                                case url if url.contains("://") => url
+                                case url if !url.contains("://") && url.nonEmpty => url.prependedAll("wss://")
+                                case _ => ""
+                              }.flatMap(url =>
+                                if url.contains("://") then
+                                  rawRelayUri.set(url)
+                                else IO.unit
+                              )
+                            case _ => IO.unit
+                          }
+                        ))
+                      )  
+                    }
+                case url =>
+                    renderSubmitToRelay(store,validEvent,initialRelayUri = url, submitOnFirstLoad = true)
+              }
+            )
+          case false =>
+            div(
+              cls := "flex items-center rounded",
+              button(
+                Styles.buttonSmall,
+                initialButtonLabel,
+                onClick --> (_.foreach{_ => isActive.set(true) }),
+              )
+            )
+        }
+      )
+  }
+
   private def entry(
       key: String,
       value: String,
@@ -339,9 +484,6 @@ object Components {
     if !dynamic && relays.isEmpty then div("")
     else
       SignallingRef[IO].of(false).toResource.flatMap { active =>
-        val value =
-          if relays.size > 0 then relays.reduce((a, b) => s"$a, $b") else ""
-
         div(
           cls := "flex items-center space-x-3",
           span(cls := "font-bold", "relay hints "),
