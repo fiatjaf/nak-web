@@ -263,12 +263,22 @@ object Components {
       else None,
       entry("serialized event", event.serialized),
       entry("implied event id", event.hash.toHex),
-      entry(
-        "does the implied event id match the given event id?",
-        event.id == Some(event.hash.toHex) match {
-          case true => "yes"; case false => "no"
-        }
-      ),
+      event.id == Some(event.hash.toHex) match {
+        case true => entry(
+          "does the implied event id match the given event id?",
+          "yes"
+        )
+        case false => fixableEntry(
+          "does the implied event id match the given event id?",
+          "no",
+          fixWith = store.input.set(
+            event
+              .copy(id = Some(event.hash.toHex))
+              .asJson
+              .printWith(jsonPrinter)
+          )
+        )
+      },
       entry(
         "is signature valid?",
         event.isValid match {
@@ -448,6 +458,22 @@ object Components {
         }
       )
   }
+
+  private def fixableEntry(
+    key: String,
+    value: String,
+    fixWith: => IO[Unit]
+  ): Resource[IO, HtmlDivElement[IO]] = 
+    div(
+      cls := "flex items-center space-x-3",
+      span(cls := "font-bold", key + " "),
+      span(Styles.mono, cls := "max-w-xl break-all", value),
+      button(
+        "fix",
+        Styles.buttonSmall,
+        onClick --> (_.foreach{_ => fixWith})
+      )
+    )
 
   private def entry(
       key: String,
