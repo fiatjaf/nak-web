@@ -279,12 +279,32 @@ object Components {
           )
         )
       },
-      entry(
-        "is signature valid?",
-        event.isValid match {
-          case true => "yes"; case false => "no"
-        }
-      ),
+      event.isValid match {
+        case true => entry(
+          "is signature valid?",
+          "yes"
+        )
+        case false => fixableEntry(
+          "is signature valid?",
+          "no",
+          buttonLabel = "fix with any key",
+          notice = "note: fixing with any key will update pubkey, id, and signature",
+          fixWith = {
+            val privkey = 
+              if(event.pubkey == Some(keyOne.publicKey.xonly)) then
+                keyOne
+              else
+                PrivateKey(randomBytes32())
+            
+            store.input.set(
+              event
+                .sign(privkey)
+                .asJson
+                .printWith(jsonPrinter)
+            )            
+          }
+        )
+      },
       event.id.map(id =>
         nip19_21(
           store,
@@ -462,17 +482,23 @@ object Components {
   private def fixableEntry(
     key: String,
     value: String,
-    fixWith: => IO[Unit]
+    fixWith: => IO[Unit],
+    buttonLabel: String = "fix",
+    notice: String = ""
   ): Resource[IO, HtmlDivElement[IO]] = 
     div(
       cls := "flex items-center space-x-3",
       span(cls := "font-bold", key + " "),
       span(Styles.mono, cls := "max-w-xl break-all", value),
       button(
-        "fix",
+        buttonLabel,
         Styles.buttonSmall,
         onClick --> (_.foreach{_ => fixWith})
-      )
+      ),
+      if(notice.nonEmpty) then
+        Some(span(Styles.mono, cls := "max-w-xl break-all", " " + notice))
+      else None
+
     )
 
   private def entry(
