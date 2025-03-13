@@ -305,6 +305,23 @@ object Components {
           }
         )
       },
+      // ensure timetsamp is reasonable (before Jan 1, 3000), offer to fix if not
+      (event.created_at >= 0L && event.created_at <= 32_503_680_000L) match
+        case true => None // no need to show anything
+        case false => Some(
+          fixableEntry(
+            "is timestamp valid?",
+            "no",
+            buttonLabel = "fix with current time",
+            notice = "note: fixing will update id",
+            fixWith = store.input.set(
+              event
+                .copy(created_at = new java.util.Date().getTime() / 1000)
+                .asJson
+                .printWith(jsonPrinter)
+            )
+          )
+        ),
       event.id.map(id =>
         nip19_21(
           store,
