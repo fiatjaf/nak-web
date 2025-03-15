@@ -12,7 +12,8 @@ import scala.concurrent.duration.*
 
 case class Store(
     input: SignallingRef[IO, String],
-    result: SignallingRef[IO, Result]
+    result: SignallingRef[IO, Result],
+    nip07signer: SignallingRef[IO, Resource[IO,NIP07Signer[IO]]]
 )
 
 object Store {
@@ -32,6 +33,9 @@ object Store {
       urlparam <- router.location.get.map(inputFromUri).toResource
       input <- SignallingRef[IO].of(urlparam).toResource
       result <- SignallingRef[IO, Result](Left("")).toResource
+
+      // start with nip07 debugging client
+      nip07client <- SignallingRef[IO].of(NIP07.mkDebuggingSigner()).toResource
 
       _ <- Resource.eval {
         if( urlparam.isEmpty )
@@ -86,7 +90,7 @@ object Store {
         .compile
         .drain
         .background
-    } yield Store(input, result)
+    } yield Store(input, result, nip07client)
   }
     
 }

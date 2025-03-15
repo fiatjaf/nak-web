@@ -10,10 +10,11 @@ import calico.html.io.{*, given}
 import calico.syntax.*
 import scoin.*
 import snow.*
+import calico.frp.given
 
 import Utils.*
 import Components.*
-import scala.concurrent.duration.*
+import scala.concurrent.duration.{span as _, *}
 
 object Main extends IOWebApp {
   def render: Resource[IO, HtmlDivElement[IO]] = Store(window).flatMap {
@@ -38,6 +39,11 @@ object Main extends IOWebApp {
           div(
             cls := "flex-1",
             result(store)
+          ),
+          // signing preferences
+          div(
+            cls := "flex gap-2 justify-end flex-wrap lg:mt-6 pt-6 border-t border-gray-200 space-y-4 text-sm text-gray-600",
+            nip07signer(store)
           ),
           // links at bottom
           div(
@@ -138,14 +144,22 @@ object Main extends IOWebApp {
         Styles.button,
         "generate event",
         onClick --> (_.foreach(_ =>
-          store.input.set(
-            Event(
-              kind = 1,
-              content = "hello world"
-            ).sign(keyOne)
-              .asJson
-              .printWith(jsonPrinter)
-          )
+          Resource.suspend(store.nip07signer.get).use{ signer => 
+            for
+              pubkey <- signer.publicKey
+              generatedEvent <- IO(
+                Event( 
+                  kind = 1, 
+                  content = "hello world", 
+                  pubkey = Some(pubkey),
+                  id = None
+                )
+              )
+              signedEvent <- signer.signEvent(generatedEvent)
+            yield signedEvent
+          }
+          .map(_.asJson.printWith(jsonPrinter))
+          .flatMap(store.input.set)
         ))
       ),
       button(
@@ -193,4 +207,53 @@ object Main extends IOWebApp {
         case Right(addr: AddressPointer) => renderAddressPointer(store, addr)
       }
     )
+
+  def nip07signer(store: Store): Resource[IO, HtmlDivElement[IO]] =
+    (
+      SignallingRef[IO].of(false).toResource,
+      SignallingRef[IO].of(false).toResource,
+    ).flatMapN {
+      (nip07isAvailable, useNip07) =>
+
+        for
+        _ <- NIP07.isAvailable.flatMap(nip07isAvailable.set).background
+        html <- div(
+          (nip07isAvailable: Signal[IO,Boolean],
+          useNip07: Signal[IO,Boolean],
+          store.nip07signer: Signal[IO,Resource[IO,NIP07Signer[IO]]]).mapN{
+            case (true, true, signer) =>
+              div(
+                span("using NIP07 pubkey: "),
+                span(signer.flatMap(_.publicKeyHex.toResource)),
+                button(
+                  "switch to debugging key",
+                  Styles.buttonSmall,
+                  onClick --> (_.foreach(_ => 
+                    store.nip07signer.set(NIP07.mkDebuggingSigner())
+                    *> useNip07.set(false)
+                  ))
+                )
+              )
+            case (true, false, signer) =>
+              div(
+                span("using debugging pubkey: "),
+                span(signer.flatMap(_.publicKeyHex.toResource)),
+                button(
+                  "switch to nip07",
+                  Styles.buttonSmall,
+                  onClick --> (_.foreach(_ => 
+                    store.nip07signer.set(NIP07.mkSigner(window))
+                    *> useNip07.set(true)
+                  ))
+                )
+              )
+            case (_,_,signer) => 
+              div(
+                span("using debugging pubkey: "),
+                span(signer.flatMap(_.publicKeyHex.toResource))       
+              )
+          }
+        )
+        yield html
+    }
 }

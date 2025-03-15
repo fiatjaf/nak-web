@@ -230,12 +230,19 @@ object Components {
                   Styles.buttonSmall,
                   "sign",
                   onClick --> (_.foreach(_ =>
-                    store.input.set(
-                      event
-                        .sign(keyOne)
-                        .asJson
-                        .printWith(jsonPrinter)
-                    )
+                    store.nip07signer.get.flatMap(_.use { signer =>
+                      for
+                        pubkey <- signer.publicKey
+                        preparedEvent <- IO(event.copy(pubkey = Some(pubkey), id = None))
+                        _ <- signer.signEvent(preparedEvent).flatMap{ signedEvent =>
+                          store.input.set(
+                          signedEvent
+                          .asJson
+                          .printWith(jsonPrinter)
+                        )
+                      }
+                      yield ()
+                    })
                   ))
                 )
               )
@@ -269,22 +276,21 @@ object Components {
         case false => fixableEntry(
           "is signature valid?",
           "no",
-          buttonLabel = "fix with any key",
-          notice = "note: fixing with any key will update pubkey, id, and signature",
-          fixWith = {
-            val privkey =
-              if(event.pubkey == Some(keyOne.publicKey.xonly)) then
-                keyOne
-              else
-                PrivateKey(randomBytes32())
-
-            store.input.set(
-              event
-                .sign(privkey)
+          buttonLabel = "sign and fix",
+          notice = "note: fixing will update pubkey, id, and signature",
+          fixWith = store.nip07signer.get.flatMap(_.use { signer =>
+            for
+              pubkey <- signer.publicKey
+              preparedEvent <- IO(event.copy(pubkey = Some(pubkey), id = None))
+              _ <- signer.signEvent(preparedEvent).flatMap{ signedEvent =>
+                store.input.set(
+                signedEvent
                 .asJson
                 .printWith(jsonPrinter)
-            )
-          }
+              )
+            }
+            yield ()
+          })
         )
       },
       // ensure timetsamp is reasonable (before Jan 1, 3000), offer to fix if not
