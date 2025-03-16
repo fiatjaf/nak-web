@@ -37,6 +37,7 @@
             nodejs
             yarn 
             just
+            fish
           ];
           packages = with pkgs; [ 
             scala 
@@ -44,6 +45,14 @@
             coursier 
             scala-cli 
           ];
+
+          # Automatically exec into fish if not already in fish.
+          shellHook = ''
+            if [ "$SHELL" != "$(which fish)" ]; then
+              exec fish
+            fi
+          '';
+          
         };
       });
     };
