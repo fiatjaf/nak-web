@@ -21,4 +21,4 @@ here is one way you can build and host a local copy of `nwak`:
 
 after step 3 of the the above, run `just` if you have it installed.
 
-that should set up a process that will continuously recompile the javascript while also serving the webpage at http://localhost:8743/index.html
+that should set up a process that will continuously recompile the javascript while also serving the webpage at http://localhost:8743

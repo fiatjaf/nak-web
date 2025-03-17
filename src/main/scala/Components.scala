@@ -434,6 +434,7 @@ object Components {
                 case url if url.isEmpty =>
                     input.withSelf { self =>
                       (
+                        cls := "w-full py-1 px-2 text-sm font-mono rounded bg-glade-green-50 border border-glade-green-200 text-gray-900",
                         defaultValue := "ws://localhost:10547",
                         onKeyPress --> (_.foreach(evt =>
                           evt.key match {
@@ -587,6 +588,7 @@ object Components {
               div(
                 input.withSelf { self =>
                   (
+                    cls := "w-full py-1 px-2 text-sm font-mono rounded bg-glade-green-50 border border-glade-green-200 text-gray-900",
                     onKeyPress --> (_.foreach(evt =>
                       // confirm adding a relay hint
                       evt.key match {
