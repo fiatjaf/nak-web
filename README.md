@@ -1,4 +1,4 @@
-# nostr army knife
+# nostr web army knife
 
 ## a toolkit for debugging all things nostr as a webpage:
 
@@ -15,6 +15,4 @@ Here is one way you can build and host a local copy of `nak-web`:
 2. checkout this repo and `cd` into it
 3. `nix develop` will get you into a dev environment with all the things (`sbt`)
 4. `sbt fullLinkJS/esBuild` will build the all important `bundle.js` file
-5. `python3 -m http.server 8743` will serve up the html/js app at [localhost:8743](http://localhost:8743)
-6. (optional) `./build-gh-pages.sh` if you want to create a local branch called "gh-pages" with only
-  the necessary things for serving (such as by github pages).
+5. `python3 -m http.server 8743` will serve up the html/js app at http://localhost:8743

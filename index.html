@@ -1,8 +1,35 @@
 <meta charset=utf-8>
-<title>nostr army knife</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<title>nostr web army knife</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<style type="text/tailwindcss">
+@theme {
+  --color-glade-green-50: #f5f8f5;
+  --color-glade-green-100: #e8f0e9;
+  --color-glade-green-200: #d1e1d2;
+  --color-glade-green-300: #adc8af;
+  --color-glade-green-400: #80a883;
+  --color-glade-green-500: #59825c;
+  --color-glade-green-600: #4a6f4d;
+  --color-glade-green-700: #3c593e;
+  --color-glade-green-800: #334835;
+  --color-glade-green-900: #2b3c2d;
+  --color-glade-green-950: #141f16;
+  --color-blue-50: #f2f7fd;
+  --color-blue-100: #e4edfa;
+  --color-blue-200: #c3dbf4;
+  --color-blue-300: #8dbdec;
+  --color-blue-400: #519bdf;
+  --color-blue-500: #2e84d4;
+  --color-blue-600: #1b63ae;
+  --color-blue-700: #174f8d;
+  --color-blue-800: #174475;
+  --color-blue-900: #193b61;
+  --color-blue-950: #102541;
+}
+</style>
 <link rel="icon" type="image/x-icon" href="./favicon.ico">
-<body class="bg-emerald-200 text-black m-0 w-full h-full">
+<body class="bg-glade-green-300 text-gray-900 m-0 w-full h-full">
   <div id="app" class="w-full h-full"></div>
   <script type="module" src="./target/esbuild/bundle.js"></script>
 </body>

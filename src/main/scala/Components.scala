@@ -24,7 +24,7 @@ object Components {
       bytes32: ByteVector32
   ): Resource[IO, HtmlDivElement[IO]] =
     div(
-      cls := "text-md",
+      cls := "flex flex-col gap-2",
       entry("canonical hex", bytes32.toHex),
       "if this is a public key:",
       div(
@@ -83,19 +83,6 @@ object Components {
           NIP19.encode(EventPointer(bytes32.toHex))
         )
       ),
-      div(
-        cls := "pl-2 mb-2",
-        entry(
-          "note",
-          NIP19.encode(bytes32),
-          Some(
-            selectable(
-              store,
-              NIP19.encode(bytes32)
-            )
-          )
-        )
-      )
     )
 
   def renderEventPointer(
@@ -103,7 +90,7 @@ object Components {
       evp: snow.EventPointer
   ): Resource[IO, HtmlDivElement[IO]] =
     div(
-      cls := "text-md",
+      cls := "text-md flex flex-col gap-2",
       entry(
         "event id (hex)",
         evp.id,
@@ -113,15 +100,10 @@ object Components {
       evp.author.map { pk =>
         entry("author (pubkey hex)", pk.value.toHex)
       },
-      evp.kind.map { kind => 
+      evp.kind.map { kind =>
         entry("kind", kind.toString)
       },
       nip19_21(store, "nevent", NIP19.encode(evp)),
-      entry(
-        "note",
-        NIP19.encode(ByteVector32.fromValidHex(evp.id)),
-        Some(selectable(store, NIP19.encode(ByteVector32.fromValidHex(evp.id))))
-      )
     )
 
   def renderProfilePointer(
@@ -130,7 +112,7 @@ object Components {
       sk: Option[PrivateKey] = None
   ): Resource[IO, HtmlDivElement[IO]] =
     div(
-      cls := "text-md",
+      cls := "text-md flex flex-col gap-2",
       sk.map { k =>
         entry(
           "private key (hex)",
@@ -171,7 +153,7 @@ object Components {
       s"${addr.kind}:${addr.author.value.toHex}:${addr.d}"
 
     div(
-      cls := "text-md",
+      cls := "text-md flex flex-col gap-2",
       entry("author (pubkey hex)", addr.author.value.toHex),
       entry("identifier (d tag)", addr.d),
       entry("kind", addr.kind.toString),
@@ -186,7 +168,7 @@ object Components {
       event: Event
   ): Resource[IO, HtmlDivElement[IO]] =
     div(
-      cls := "text-md",
+      cls := "text-md flex flex-col gap-2",
       if event.isValid then
         Some(renderSubmitEvent(store, event))
       else None,
@@ -265,11 +247,11 @@ object Components {
       entry("implied event id", event.hash.toHex),
       event.id == Some(event.hash.toHex) match {
         case true => entry(
-          "does the implied event id match the given event id?",
+          "implied event id matches given event id?",
           "yes"
         )
         case false => fixableEntry(
-          "does the implied event id match the given event id?",
+          "implied event id matches given event id?",
           "no",
           fixWith = store.input.set(
             event
@@ -290,18 +272,18 @@ object Components {
           buttonLabel = "fix with any key",
           notice = "note: fixing with any key will update pubkey, id, and signature",
           fixWith = {
-            val privkey = 
+            val privkey =
               if(event.pubkey == Some(keyOne.publicKey.xonly)) then
                 keyOne
               else
                 PrivateKey(randomBytes32())
-            
+
             store.input.set(
               event
                 .sign(privkey)
                 .asJson
                 .printWith(jsonPrinter)
-            )            
+            )
           }
         )
       },
@@ -322,13 +304,6 @@ object Components {
             )
           )
         ),
-      event.id.map(id =>
-        nip19_21(
-          store,
-          "nevent",
-          NIP19.encode(EventPointer(id, author = event.pubkey, kind = Some(event.kind)))
-        )
-      ),
       if event.kind >= 30000 && event.kind < 40000 then
         event.pubkey
           .map(author =>
@@ -349,26 +324,26 @@ object Components {
           )
       else
         event.id.map(id =>
-          entry(
-            "note",
-            NIP19.encode(ByteVector32.fromValidHex(id)),
-            Some(selectable(store, NIP19.encode(ByteVector32.fromValidHex(id))))
+          nip19_21(
+            store,
+            "nevent",
+            NIP19.encode(EventPointer(id, author = event.pubkey, kind = Some(event.kind)))
           )
         )
     )
 
   def renderSubmitEvent(
-    store: Store, 
+    store: Store,
     event: Event
-  ): Resource[IO, HtmlDivElement[IO]] =   
+  ): Resource[IO, HtmlDivElement[IO]] =
     if(event.isValid) then
-      SignallingRef[IO].of(Option.empty[Messages.FromRelay.OK]).toResource.flatMap { 
+      SignallingRef[IO].of(Option.empty[Messages.FromRelay.OK]).toResource.flatMap {
         relayReply =>
           div(
             cls := "flex items-center space-x-3",
             span(cls := "font-bold", "submit to relay? "),
             div(
-              cls := "flex flex-wrap max-w-xl",
+              cls := "flex flex-wrap justify-between max-w-xl gap-2",
               renderSubmitToRelay(store,event,"ws://localhost:10547"),
               renderSubmitToRelay(store,event,"wss://relay.damus.io"),
               renderInputCustomRelay(store,event)
@@ -383,30 +358,30 @@ object Components {
     validEvent: Event,
     initialRelayUri: String,
     submitOnFirstLoad: Boolean = false
-  ): Resource[IO, HtmlDivElement[IO]] = 
+  ): Resource[IO, HtmlDivElement[IO]] =
     (
       SignallingRef[IO].of(false).toResource,
       SignallingRef[IO].of(Option.empty[Messages.FromRelay.OK]).toResource
-    ).tupled.flatMap { 
+    ).tupled.flatMap {
       (awaitingReply, relayReply) =>
-        val submitEvent = 
+        val submitEvent =
           IO.fromEither(org.http4s.Uri.fromString(initialRelayUri))
             .toResource
             .flatMap(Relay.mkResourceForIO(_))
-            .use(relay => 
-              awaitingReply.set(true) 
+            .use(relay =>
+              awaitingReply.set(true)
               *> (relay.submitEvent(validEvent).option >>= relayReply.set)
               <* (awaitingReply.set(false))
             ).recoverWith{
-              case e: java.io.IOException => 
+              case e: java.io.IOException =>
                 relayReply.set(Some(Messages.FromRelay.OK("",false,"websocket connection error")))
-                *> awaitingReply.set(false) 
+                *> awaitingReply.set(false)
             }
-        
+
         val buttonLabel = (awaitingReply: Signal[IO,Boolean]).flatMap {
           case false => relayReply.map {
             case None => s"$initialRelayUri"
-            case Some(Messages.FromRelay.OK(_,accepted,_)) 
+            case Some(Messages.FromRelay.OK(_,accepted,_))
               if accepted => s"$initialRelayUri - \u2705"
             case Some(Messages.FromRelay.OK(_,accepted,message))
               if !accepted => s"$initialRelayUri - FAIL - $message"
@@ -445,7 +420,7 @@ object Components {
   def renderInputCustomRelay(
     store: Store,
     validEvent: Event,
-    initialButtonLabel: String = "Custom Relay"
+    initialButtonLabel: String = "custom relay"
   ): Resource[IO, HtmlDivElement[IO]] = (
     SignallingRef[IO].of(false).toResource,
     SignallingRef[IO].of("").toResource
@@ -457,7 +432,7 @@ object Components {
             div(
               rawRelayUri.map {
                 case url if url.isEmpty =>
-                    input.withSelf { self => 
+                    input.withSelf { self =>
                       (
                         defaultValue := "ws://localhost:10547",
                         onKeyPress --> (_.foreach(evt =>
@@ -477,7 +452,7 @@ object Components {
                             case _ => IO.unit
                           }
                         ))
-                      )  
+                      )
                     }
                 case url =>
                     renderSubmitToRelay(store,validEvent,initialRelayUri = url, submitOnFirstLoad = true)
@@ -502,18 +477,18 @@ object Components {
     fixWith: => IO[Unit],
     buttonLabel: String = "fix",
     notice: String = ""
-  ): Resource[IO, HtmlDivElement[IO]] = 
+  ): Resource[IO, HtmlDivElement[IO]] =
     div(
       cls := "flex items-center space-x-3",
       span(cls := "font-bold", key + " "),
-      span(Styles.mono, cls := "max-w-xl break-all", value),
+      span(cls := "font-mono max-w-xl break-all", value),
       button(
         buttonLabel,
         Styles.buttonSmall,
         onClick --> (_.foreach{_ => fixWith})
       ),
       if(notice.nonEmpty) then
-        Some(span(Styles.mono, cls := "max-w-xl break-all", " " + notice))
+        Some(span(cls := "font-mono max-w-xl break-all", " " + notice))
       else None
 
     )
@@ -526,7 +501,7 @@ object Components {
     div(
       cls := "flex items-center space-x-3",
       span(cls := "font-bold", key + " "),
-      span(Styles.mono, cls := "max-w-xl break-all", value),
+      span(cls := "font-mono max-w-xl break-all", value),
       selectLink
     )
 
@@ -537,7 +512,7 @@ object Components {
   ): Resource[IO, HtmlDivElement[IO]] =
     div(
       span(cls := "font-bold", key + " "),
-      span(Styles.mono, cls := "break-all", code),
+      span(cls := "font-mono break-all", code),
       selectable(store, code),
       a(
         href := "nostr:" + code,
@@ -564,8 +539,7 @@ object Components {
               relays
                 .map(url =>
                   div(
-                    Styles.mono,
-                    cls := "flex items-center rounded py-0.5 px-1 mr-1 mb-1 bg-orange-100",
+                    cls := "font-mono flex items-center rounded py-0.5 px-1 mr-1 mb-1 bg-orange-100",
                     url,
                     // removing a relay hint by clicking on the x
                     div(

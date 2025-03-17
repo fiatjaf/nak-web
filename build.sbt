@@ -1,6 +1,6 @@
 enablePlugins(ScalaJSPlugin, EsbuildPlugin)
 
-name := "nostr-army-knife"
+name := "nwak"
 scalaVersion := "3.3.4"
 
 lazy val root = (project in file("."))

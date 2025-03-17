@@ -19,37 +19,43 @@ object Main extends IOWebApp {
   def render: Resource[IO, HtmlDivElement[IO]] = Store(window).flatMap {
     store =>
       div(
-        cls := "flex w-full flex-col items-center justify-center",
+        cls := "grid lg:flex grid-rows-[auto_auto] lg:flex-row w-full min-h-screen",
+        // sidebar
         div(
-          cls := "w-4/5",
+          cls := "order-2 lg:order-1 justify-self-end w-full lg:w-1/2 bg-white mt-6 lg:mt-0 p-6 flex flex-col border-r border-gray-200",
           h1(
-            cls := "px-1 py-2 text-center text-xl",
+            cls := "hidden lg:flex items-center justify-end mb-8",
             img(
-              cls := "inline-block w-8 mr-2",
+              cls := "w-8 mr-2",
               src := "./favicon.ico"
             ),
             a(
               href := "/",
-              "nostr army knife"
+              cls := "text-xl font-bold text-gray-900",
+              "nostr web army knife"
             )
           ),
           div(
-            cls := "flex my-3",
+            cls := "flex-1",
+            result(store)
+          ),
+          // links at bottom
+          div(
+            cls := "flex gap-2 justify-end flex-wrap lg:mt-6 pt-6 border-t border-gray-200 space-y-4 text-sm text-gray-600",
+            a(
+              href := "https://github.com/fiatjaf/nwak",
+              cls := "block hover:text-gray-900",
+              "source code"
+            ),
+          )
+        ),
+        // main content
+        div(
+          cls := "order-1 lg-order-2 justify-self-start lg:flex lg:items-center lg:justify-center w-full",
+          div(
+            cls := "bg-white w-full lg:w-auto lg:rounded-lg shadow-md p-4 pt-6 lg:p-12",
             input(store),
             actions(store)
-          ),
-          result(store)
-        ),
-        div(
-          cls := "flex justify-end mr-5 mt-10 text-xs w-4/5",
-          a(
-            href := "https://github.com/fiatjaf/nak-web",
-            "source code"
-          ),
-          a(
-            cls := "ml-4",
-            href := "https://github.com/fiatjaf/nak",
-            "get the command-line tool"
           )
         )
       )
@@ -57,7 +63,7 @@ object Main extends IOWebApp {
 
   def actions(store: Store): Resource[IO, HtmlDivElement[IO]] =
     div(
-      cls := "flex flex-col space-y-1 my-3",
+      cls := "flex flex-wrap justify-evenly pt-4 gap-2",
       store.input.map {
         case "" => div("")
         case _ =>
@@ -87,16 +93,16 @@ object Main extends IOWebApp {
           Some(
             SignallingRef[IO].of(false).toResource.flatMap { fetchIsInProgress =>
 
-              def fetchFromRelay(rawUri: String): IO[Option[Event]] = 
+              def fetchFromRelay(rawUri: String): IO[Option[Event]] =
                 IO.fromEither(org.http4s.Uri.fromString(rawUri))
                     .toResource
                     .flatMap(Relay.mkResourceForIO(_))
                     .use{ relay => relay.lookupEventById(evp.id, timeout = 30.seconds) }
-                    .reject{ 
+                    .reject{
                       case None => new RuntimeException(s"event-not-found: ${evp.id} not found at $rawUri")
                     }
-              
-              val tryFetchFromEachOrNone = 
+
+              val tryFetchFromEachOrNone =
                 multiRaceAllFailOrFirstToSucceed(evp.relays.map(fetchFromRelay))
                 .recover(_ => None)
 
@@ -104,14 +110,14 @@ object Main extends IOWebApp {
                 case Some(event) => store.input.set(event.asJson.printWith(jsonPrinter))
                 // for now we will just display a failure message in the input
                 // textarea, but this should be made better
-                case None => 
+                case None =>
                   store.input.set(s"tried all the given relay hints, but event ${evp.id} was not found.")
-          
+
               val fetchOrUnit = fetchIsInProgress.get.flatMap {
                 case true => IO.unit
-                case false => 
-                  fetchIsInProgress.set(true) 
-                  *> tryFetchFromEachOrNone.flatMap(updateInput) 
+                case false =>
+                  fetchIsInProgress.set(true)
+                  *> tryFetchFromEachOrNone.flatMap(updateInput)
                   *> fetchIsInProgress.set(false)
               }
               val buttonLabel = fetchIsInProgress.map {
@@ -155,27 +161,23 @@ object Main extends IOWebApp {
 
   def input(store: Store): Resource[IO, HtmlDivElement[IO]] =
     div(
-      cls := "w-full grow",
-      div(
-        cls := "w-full flex justify-center",
-        textArea.withSelf { self =>
-          (
-            cls := "w-full max-h-96 p-3 rounded",
-            styleAttr := "min-height: 280px; font-family: monospace",
-            spellCheck := false,
-            placeholder := "paste something nostric (event JSON, nprofile, npub, nevent etc or hex key or id)",
-            onInput --> (_.foreach(_ =>
-              self.value.get.flatMap(store.input.set)
-            )),
-            value <-- store.input
-          )
-        }
-      )
+      cls := "w-full",
+      textArea.withSelf { self =>
+        (
+          cls := "w-full p-2 lg:p-4 min-h-[280px] lg:min-h-[370px] lg:min-w-[500px] font-mono rounded-lg bg-glade-green-50 border border-glade-green-200 text-gray-900",
+          spellCheck := false,
+          placeholder := "paste something nostric (event JSON, nprofile, npub, nevent etc or hex key or id)",
+          onInput --> (_.foreach(_ =>
+            self.value.get.flatMap(store.input.set)
+          )),
+          value <-- store.input
+        )
+      }
     )
 
   def result(store: Store): Resource[IO, HtmlDivElement[IO]] =
     div(
-      cls := "w-full flex my-5",
+      cls := "w-full",
       store.result.map {
         case Left(msg)                  => div(msg)
         case Right(bytes: ByteVector32) => render32Bytes(store, bytes)
