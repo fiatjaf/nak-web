@@ -13,3 +13,5 @@ lazy val root = (project in file("."))
     scalaJSUseMainModuleInitializer := true,
     scalaJSLinkerConfig ~= { _.withModuleKind(ModuleKind.CommonJSModule) }
   )
+
+esPackageManager := Npm
