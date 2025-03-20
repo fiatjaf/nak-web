@@ -36,14 +36,6 @@ object Store {
 
       // start with nip07 debugging client
       nip07client <- SignallingRef[IO].of(NIP07.mkDebuggingSigner()).toResource
-
-      _ <- Resource.eval {
-        if( urlparam.isEmpty )
-          OptionT(window.localStorage.getItem(key))
-            .foreachF(input.set(_))
-        else
-          IO.unit
-      }
       
       _ <- window.localStorage
         .events(window)
